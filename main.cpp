@@ -28,9 +28,10 @@ class Expression {
   // constructor for value
   Expression(char value) : _type(NodeType::Value), _value(std::move(value)) {}
 
-  const Expression getLeft() { return *_left.get(); }
-  const Expression getRight() { return *_right.get(); }
+  const std::shared_ptr<Expression>& getLeft() { return _left; }
+  const std::shared_ptr<Expression>& getRight() { return _right; }
   NodeType getType() { return _type; }
+  const char& getValue() { return _value; }
   void starRightSide() { _right = std::make_shared<Expression>(NodeType::Star, std::move(_right)); }
   void printTree(const std::string& prefix = "", bool is_right = false) {
     std::cout << prefix;
@@ -170,6 +171,139 @@ class RegExpParser {
   }
 };
 
+// enum class NfaNodeType {
+
+// };
+
+class NfaNode {
+  std::shared_ptr<NfaNode> _left;
+  std::shared_ptr<NfaNode> _right;
+  bool _eps;
+  char _symbol;
+
+ public:
+  NfaNode(std::shared_ptr<NfaNode> left, const char& symbol) : _left(std::move(left)), _symbol(symbol), _eps(false) {}
+  NfaNode(std::shared_ptr<NfaNode> left) : _left(std::move(left)), _eps(true) {}
+  NfaNode(std::shared_ptr<NfaNode> left, std::shared_ptr<NfaNode> right)
+      : _left(std::move(left)), _right(std::move(right)), _eps(true) {}
+  NfaNode() : _eps(false) {}
+
+  const std::shared_ptr<NfaNode>& getLeft() { return _left; }
+  const std::shared_ptr<NfaNode>& getRight() { return _right; }
+  bool isEpsilon() { return _eps; }
+  const char getSymbol() { return _symbol; }
+
+  void setLeft(const std::shared_ptr<NfaNode>& node) { _left = node; }
+  void setRight(const std::shared_ptr<NfaNode>& node) { _right = node; }
+  void setEpsilon(bool eps) { _eps = eps; }
+
+  void setNode(const NfaNode& t) {
+    if (this != &t) {
+      _left = t._left;
+      _right = t._right;
+      _eps = t._eps;
+      _symbol = t._symbol;
+    }
+  }
+
+  // NfaNode& operator=(const NfaNode& t) {
+  //   if (this != &t) {
+  //     _left = t._left;
+  //     _right = t._right;
+  //     _eps = t._eps;
+  //     _symbol = t._symbol;
+  //   }
+  //   return *this;
+  // }
+};
+
+typedef std::shared_ptr<NfaNode> SPNfaNode;
+
+class NfaStructure {
+  SPNfaNode _start;
+  SPNfaNode _final;
+
+ public:
+  NfaStructure() {}
+  const SPNfaNode& getStart() { return _start; }
+  const SPNfaNode& getFinal() { return _final; }
+  bool isFinal(const SPNfaNode& node) { return _final == node; }
+  void setStart(const SPNfaNode& node) { _start = node; }
+  void setFinal(const SPNfaNode& node) { _final = node; }
+};
+
+class TransformReToNfa {
+ public:
+  TransformReToNfa() {}
+  /**
+   * Function that recursivly transforms a tree
+   * @param expr proto message which specifies the type of the writer, and provides needed data
+   * @return a unique pointer to table writer, or error
+   */
+  ErrOr<NfaStructure> transform(const SPExpression& expr) {
+    if (expr->getType() == NodeType::Value) {
+      NfaStructure nfa;
+      auto temp = std::make_shared<NfaNode>(std::make_shared<NfaNode>(), expr->getValue());
+      nfa.setStart(temp);
+      nfa.setFinal(temp->getLeft());
+      return std::move(nfa);
+    }
+    auto ret = transform(expr->getLeft());
+    if (ret.err) return *ret.err;
+    auto nfa = *ret.data;
+    switch (expr->getType()) {
+      case NodeType::Add: {
+        ret = transform(expr->getRight());
+        if (ret.err) return *ret.err;
+        auto rhs = *ret.data;
+        nfa.getFinal()->setNode(*rhs.getStart().get());
+        nfa.setFinal(rhs.getFinal());
+        return std::move(nfa);
+      }
+      case NodeType::Brackets: {
+        return std::move(nfa);
+      }
+      case NodeType::Star: {
+        auto final = std::make_shared<NfaNode>();
+        auto start = std::make_shared<NfaNode>(nfa.getStart(), final);
+
+        nfa.getFinal()->setEpsilon(true);
+        nfa.getFinal()->setLeft(nfa.getStart());
+        nfa.getFinal()->setRight(final);
+
+        nfa.setStart(start);
+        nfa.setFinal(final);
+
+        return std::move(nfa);
+      }
+      case ::NodeType::Or: {
+        ret = transform(expr->getRight());
+        if (ret.err) return *ret.err;
+        auto rhs = *ret.data;
+
+        auto start = std::make_shared<NfaNode>(nfa.getStart(), rhs.getStart());
+        auto final = std::make_shared<NfaNode>();
+
+        const auto& left_final = nfa.getFinal();
+        left_final->setEpsilon(true);
+        left_final->setLeft(final);
+
+        const auto& right_final = rhs.getFinal();
+        right_final->setEpsilon(true);
+        right_final->setLeft(final);
+
+        nfa.setStart(start);
+        nfa.setFinal(final);
+
+        return std::move(nfa);
+      }
+      default: {
+        return ERROR_WITH_FILE("unknown node type");
+      }
+    }
+  }
+};
+
 int main(int argc, char** argv) {
   if (argc != 2) return 0;
 
@@ -178,10 +312,18 @@ int main(int argc, char** argv) {
   auto ret = parser.parseExpression(expression);
   if (ret.err) {
     cout << "error :" << ret.err.value().msg << endl;
-  } else {
-    cout << "no errors\n";
-    ret.data.value().second->printTree();
+    return 0;
   }
+  cout << "no errors\n";
+  ret.data.value().second->printTree();
+  TransformReToNfa transform;
+  auto nfa = transform.transform(ret.data.value().second);
+  if (nfa.err) {
+    cout << "error :" << nfa.err.value().msg << endl;
+    return 0;
+  }
+  cout << "no error in nfa\n";
+  auto tree = *nfa.data;
 
   return 1;
 }
