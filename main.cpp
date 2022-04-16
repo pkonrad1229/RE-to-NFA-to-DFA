@@ -2,6 +2,8 @@
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <set>
+
 using namespace std;
 
 enum class NodeType {
@@ -104,10 +106,10 @@ class RegExpParser {
     while (expression.size()) {
       switch (expression.at(0)) {
         case '*': {
-          if (curr == nullptr) return ERROR_WITH_FILE("star called without anything before");
+          if (curr == nullptr) return ERROR_WITH_FILE("KLEENE CLOSURE called without anything before");
           switch (curr->getType()) {
             case NodeType::Star: {
-              return ERROR_WITH_FILE("star operators cannot be nested");
+              return ERROR_WITH_FILE("KLEENE CLOSURE operators cannot be nested");
             }
             case NodeType::Brackets:
             case NodeType::Value: {
@@ -120,7 +122,7 @@ class RegExpParser {
               break;
             }
             default: {
-              return ERROR_WITH_FILE("unknown node type, error");
+              return ERROR_WITH_FILE("unknown node type in kleene closure, error");
             }
           }
           break;
@@ -143,17 +145,18 @@ class RegExpParser {
           return std::make_pair(expression, std::move(curr));
         }
         case '|': {
+          if (curr == nullptr) return ERROR_WITH_FILE("OR called without anything before");
           expression.erase(0, 1);
           auto ret = parseExpression(expression);
           if (ret.err) return *ret.err;
           expression = ret.data.value().first;
           if (expression.size() != 0 && expression.at(0) != ')') {
-            return ERROR_WITH_FILE("or expression not parsed correctly");
+            return ERROR_WITH_FILE("OR expression not parsed correctly");
           }
 
           auto rhs = std::move(ret.data.value().second);
           if (rhs == nullptr) {
-            return ERROR_WITH_FILE("or expression rhs is empty");
+            return ERROR_WITH_FILE("OR expression rhs is empty");
           }
           curr = std::make_shared<Expression>(NodeType::Or, std::move(curr), std::move(rhs));
           return std::make_pair(expression, std::move(curr));
@@ -281,7 +284,6 @@ class NfaStructure {
     }
   }
 };
-
 class TransformReToNfa {
  public:
   TransformReToNfa() {}
@@ -369,6 +371,42 @@ class TransformReToNfa {
   }
 };
 
+struct custom_compare final {
+  bool operator()(const SPNfaNode& left, const SPNfaNode& right) const { return left->getId() < right->getId(); }
+};
+
+class DfaState : public std::set<SPNfaNode, custom_compare> {
+ public:
+  DfaState move(const char& symbol) {
+    DfaState state;
+    for (const auto& node : *this) {
+      if (!node->isEpsilon() && node->getSymbol() == symbol) {
+        state.insert(node);
+      }
+    }
+    return state;
+  }
+  DfaState epsilonClosure() {
+    DfaState state = *this;
+    while (true) {
+      DfaState temp = state;
+      for (const auto& node : state) {
+        if (node->isEpsilon()) {
+          state.insert(node->getLeft());
+          if (node->getRight()) state.insert(node->getRight());
+        }
+      }
+      if (temp.size() == state.size()) break;
+    }
+    return state;
+  }
+};
+
+class DFA {
+  DfaState _start;
+  DfaState _finish;
+};
+
 int main(int argc, char** argv) {
   if (argc != 2) return 0;
 
@@ -376,18 +414,16 @@ int main(int argc, char** argv) {
   RegExpParser parser;
   auto ret = parser.parseExpression(expression);
   if (ret.err) {
-    cout << "error :" << ret.err.value().msg << endl;
+    cout << "RE error :" << ret.err.value().msg << endl;
     return 0;
   }
-  cout << "no errors\n";
   ret.data.value().second->printTree();
   TransformReToNfa transform;
   auto nfa = transform.transform(ret.data.value().second);
   if (nfa.err) {
-    cout << "error :" << nfa.err.value().msg << endl;
+    cout << "NFA error :" << nfa.err.value().msg << endl;
     return 0;
   }
-  cout << "no error in nfa\n";
   auto tree = *nfa.data;
   tree.print();
 
