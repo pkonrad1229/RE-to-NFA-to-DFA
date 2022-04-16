@@ -176,10 +176,13 @@ class RegExpParser {
 // };
 
 class NfaNode {
-  std::shared_ptr<NfaNode> _left;
+  std::shared_ptr<NfaNode> _left;  // pointer to next (or previous in case of kleene clousure) node
   std::shared_ptr<NfaNode> _right;
-  bool _eps;
-  char _symbol;
+  bool _eps;            // true if the node has epsilon transition(s)
+  char _symbol;         // symbol of the transition, if transition is not eps
+  size_t _id;           // id of a node, node with id = 1 is the starting node
+  bool _was_set{true};  // this boolean is used in setting node ids and printing, to ensure that a single node isnt
+                        // affected more than once
 
  public:
   NfaNode(std::shared_ptr<NfaNode> left, const char& symbol) : _left(std::move(left)), _symbol(symbol), _eps(false) {}
@@ -192,10 +195,13 @@ class NfaNode {
   const std::shared_ptr<NfaNode>& getRight() { return _right; }
   bool isEpsilon() { return _eps; }
   const char getSymbol() { return _symbol; }
+  size_t& getId() { return _id; }
+  bool& getWasSet() { return _was_set; }
 
   void setLeft(const std::shared_ptr<NfaNode>& node) { _left = node; }
   void setRight(const std::shared_ptr<NfaNode>& node) { _right = node; }
   void setEpsilon(bool eps) { _eps = eps; }
+  void setId(const size_t& id) { _id = id; }
 
   void setNode(const NfaNode& t) {
     if (this != &t) {
@@ -205,16 +211,6 @@ class NfaNode {
       _symbol = t._symbol;
     }
   }
-
-  // NfaNode& operator=(const NfaNode& t) {
-  //   if (this != &t) {
-  //     _left = t._left;
-  //     _right = t._right;
-  //     _eps = t._eps;
-  //     _symbol = t._symbol;
-  //   }
-  //   return *this;
-  // }
 };
 
 typedef std::shared_ptr<NfaNode> SPNfaNode;
@@ -222,14 +218,68 @@ typedef std::shared_ptr<NfaNode> SPNfaNode;
 class NfaStructure {
   SPNfaNode _start;
   SPNfaNode _final;
+  size_t _num_of_nodes;
 
  public:
-  NfaStructure() {}
+  NfaStructure() : _num_of_nodes(0) {}
   const SPNfaNode& getStart() { return _start; }
   const SPNfaNode& getFinal() { return _final; }
   bool isFinal(const SPNfaNode& node) { return _final == node; }
   void setStart(const SPNfaNode& node) { _start = node; }
   void setFinal(const SPNfaNode& node) { _final = node; }
+  size_t& getSize() { return _num_of_nodes; }
+  void increaseAllIds(const size_t& num) {
+    setWasIncreased(_start);
+    increaseIds(_start, num);
+  }
+
+  void print() {
+    setWasIncreased(_start);
+    std::cout << "STARTING NODE ";
+    print(_start);
+    std::cout << "FINAL NODE id: " << _final->getId() << std::endl;
+  }
+
+ private:
+  void increaseIds(const SPNfaNode& root, const size_t& num) {
+    if (!root || root->getWasSet()) return;
+    root->getId() += num;
+    root->getWasSet() = true;
+    if (root->getLeft()) {
+      increaseIds(root->getLeft(), num);
+    }
+    if (root->getRight()) {
+      increaseIds(root->getRight(), num);
+    }
+  }
+  void setWasIncreased(const SPNfaNode& root) {
+    if (!root || !root->getWasSet()) return;
+    root->getWasSet() = false;
+    if (root->getLeft()) {
+      setWasIncreased(root->getLeft());
+    }
+    if (root->getRight()) {
+      setWasIncreased(root->getRight());
+    }
+  }
+  void print(const SPNfaNode& root) {
+    if (!root || root->getWasSet() || root == _final) return;
+    root->getWasSet() = true;
+    std::cout << "id: " << root->getId() << " ,";
+    if (root->isEpsilon()) {
+      std::cout << "epsilon transition to node " << root->getLeft()->getId();
+      if (root->getRight()) {
+        std::cout << " and " << root->getRight()->getId();
+      }
+      std::cout << std::endl;
+    } else {
+      cout << "transition on character '" << root->getSymbol() << "' to node " << root->getLeft()->getId() << std::endl;
+    }
+    print(root->getLeft());
+    if (root->getRight()) {
+      print(root->getRight());
+    }
+  }
 };
 
 class TransformReToNfa {
@@ -244,6 +294,9 @@ class TransformReToNfa {
     if (expr->getType() == NodeType::Value) {
       NfaStructure nfa;
       auto temp = std::make_shared<NfaNode>(std::make_shared<NfaNode>(), expr->getValue());
+      temp->setId(1);
+      temp->getLeft()->setId(2);
+      nfa.getSize() = 2;
       nfa.setStart(temp);
       nfa.setFinal(temp->getLeft());
       return std::move(nfa);
@@ -256,6 +309,8 @@ class TransformReToNfa {
         ret = transform(expr->getRight());
         if (ret.err) return *ret.err;
         auto rhs = *ret.data;
+        rhs.increaseAllIds(nfa.getSize() - 1);
+        nfa.getSize() += rhs.getSize() - 1;
         nfa.getFinal()->setNode(*rhs.getStart().get());
         nfa.setFinal(rhs.getFinal());
         return std::move(nfa);
@@ -266,6 +321,10 @@ class TransformReToNfa {
       case NodeType::Star: {
         auto final = std::make_shared<NfaNode>();
         auto start = std::make_shared<NfaNode>(nfa.getStart(), final);
+
+        nfa.increaseAllIds(1);
+        start->setId(1);
+        final->setId(nfa.getSize() += 2);
 
         nfa.getFinal()->setEpsilon(true);
         nfa.getFinal()->setLeft(nfa.getStart());
@@ -282,16 +341,22 @@ class TransformReToNfa {
         auto rhs = *ret.data;
 
         auto start = std::make_shared<NfaNode>(nfa.getStart(), rhs.getStart());
+        start->setId(1);
+        nfa.increaseAllIds(1);
         auto final = std::make_shared<NfaNode>();
 
         const auto& left_final = nfa.getFinal();
         left_final->setEpsilon(true);
         left_final->setLeft(final);
 
+        rhs.increaseAllIds(++nfa.getSize());
+        nfa.getSize() += rhs.getSize();
+
         const auto& right_final = rhs.getFinal();
         right_final->setEpsilon(true);
         right_final->setLeft(final);
 
+        final->setId(++nfa.getSize());
         nfa.setStart(start);
         nfa.setFinal(final);
 
@@ -324,6 +389,7 @@ int main(int argc, char** argv) {
   }
   cout << "no error in nfa\n";
   auto tree = *nfa.data;
+  tree.print();
 
   return 1;
 }
