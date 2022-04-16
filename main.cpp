@@ -12,30 +12,26 @@ enum class NodeType {
   Brackets,
 };
 
-class Node {
+class Expression {
   NodeType _type;
-  shared_ptr<Node> _left;
-  shared_ptr<Node> _right;
+  shared_ptr<Expression> _left;
+  shared_ptr<Expression> _right;
   char _value;
 
  public:
   // constructor for concat and or
-  Node(NodeType type, shared_ptr<Node> left, shared_ptr<Node> right)
-      : _type(type), _left(std::move(left)), _right(std::move(right)) {
-    cout << "add node" << endl;
-  }
+  Expression(NodeType type, shared_ptr<Expression> left, shared_ptr<Expression> right)
+      : _type(type), _left(std::move(left)), _right(std::move(right)) {}
 
   // constructor for star
-  Node(NodeType type, shared_ptr<Node> left) : _type(type), _left(std::move(left)) { cout << "star node" << endl; }
+  Expression(NodeType type, shared_ptr<Expression> left) : _type(type), _left(std::move(left)) {}
   // constructor for value
-  Node(char value) : _type(NodeType::Value), _value(std::move(value)) {
-    cout << "value nowe with char:" << _value << endl;
-  }
+  Expression(char value) : _type(NodeType::Value), _value(std::move(value)) {}
 
-  const Node getLeft() { return *_left.get(); }
-  const Node getRight() { return *_right.get(); }
+  const Expression getLeft() { return *_left.get(); }
+  const Expression getRight() { return *_right.get(); }
   NodeType getType() { return _type; }
-  void starRightSide() { _right = std::make_shared<Node>(NodeType::Star, std::move(_right)); }
+  void starRightSide() { _right = std::make_shared<Expression>(NodeType::Star, std::move(_right)); }
   void printTree(const std::string& prefix = "", bool is_right = false) {
     std::cout << prefix;
     std::cout << (is_right ? "|--" : "L--");
@@ -74,7 +70,7 @@ class Node {
   }
 };
 
-typedef shared_ptr<Node> SPNode;
+typedef shared_ptr<Expression> SPExpression;
 
 struct Error {
   std::string msg;
@@ -102,8 +98,8 @@ struct ErrOr {
 class RegExpParser {
  public:
   RegExpParser() {}
-  ErrOr<std::pair<std::string, SPNode>> parseExpression(std::string expression) {
-    shared_ptr<Node> curr;
+  ErrOr<std::pair<std::string, SPExpression>> parseExpression(std::string expression) {
+    shared_ptr<Expression> curr;
     while (expression.size()) {
       switch (expression.at(0)) {
         case '*': {
@@ -112,15 +108,13 @@ class RegExpParser {
             case NodeType::Star: {
               return ERROR_WITH_FILE("star operators cannot be nested");
             }
+            case NodeType::Brackets:
             case NodeType::Value: {
-              curr = make_shared<Node>(NodeType::Star, std::move(curr));
-              cout << "star on value" << endl;
+              curr = make_shared<Expression>(NodeType::Star, std::move(curr));
               break;
             }
             case NodeType::Add:
             case NodeType::Or: {
-              cout << "star on add/or" << endl;
-
               curr->starRightSide();
               break;
             }
@@ -131,7 +125,6 @@ class RegExpParser {
           break;
         }
         case '(': {
-          std::cout << "opened bracked\n";
           expression.erase(0, 1);
           auto ret = parseExpression(expression);
           if (ret.err) return *ret.err;
@@ -139,14 +132,13 @@ class RegExpParser {
           if (expression.size() == 0 || expression.at(0) != ')') {
             return ERROR_WITH_FILE("bracket not closed");
           }
-          auto temp = std::make_shared<Node>(NodeType::Brackets, std::move(ret.data.value().second));
+          auto temp = std::make_shared<Expression>(NodeType::Brackets, std::move(ret.data.value().second));
           curr == nullptr ? curr = std::move(temp)
-                          : curr = std::make_shared<Node>(NodeType::Add, std::move(curr), std::move(temp));
+                          : curr = std::make_shared<Expression>(NodeType::Add, std::move(curr), std::move(temp));
 
           break;
         }
         case ')': {
-          std::cout << "closed bracked\n";
           return std::make_pair(expression, std::move(curr));
         }
         case '|': {
@@ -162,13 +154,13 @@ class RegExpParser {
           if (rhs == nullptr) {
             return ERROR_WITH_FILE("or expression rhs is empty");
           }
-          curr = std::make_shared<Node>(NodeType::Or, std::move(curr), std::move(rhs));
+          curr = std::make_shared<Expression>(NodeType::Or, std::move(curr), std::move(rhs));
           return std::make_pair(expression, std::move(curr));
         }
         default: {
-          auto temp = std::make_shared<Node>(expression.at(0));
+          auto temp = std::make_shared<Expression>(expression.at(0));
           curr == nullptr ? curr = std::move(temp)
-                          : curr = std::make_shared<Node>(NodeType::Add, std::move(curr), std::move(temp));
+                          : curr = std::make_shared<Expression>(NodeType::Add, std::move(curr), std::move(temp));
           break;
         }
       }
@@ -186,8 +178,10 @@ int main(int argc, char** argv) {
   auto ret = parser.parseExpression(expression);
   if (ret.err) {
     cout << "error :" << ret.err.value().msg << endl;
+  } else {
+    cout << "no errors\n";
+    ret.data.value().second->printTree();
   }
-  cout << "no errors\n";
-  ret.data.value().second->printTree();
+
   return 1;
 }
