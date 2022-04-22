@@ -3,6 +3,8 @@
 #include <memory>
 #include <optional>
 #include <set>
+#include <unordered_map>
+#include <vector>
 
 using namespace std;
 
@@ -179,11 +181,11 @@ class RegExpParser {
 // };
 
 class NfaNode {
-  std::shared_ptr<NfaNode> _left;  // pointer to next (or previous in case of kleene clousure) node
-  std::shared_ptr<NfaNode> _right;
-  bool _eps;            // true if the node has epsilon transition(s)
-  char _symbol;         // symbol of the transition, if transition is not eps
-  size_t _id;           // id of a node, node with id = 1 is the starting node
+  std::shared_ptr<NfaNode> _left;   // pointer to next (or previous in case of kleene clousure) node
+  std::shared_ptr<NfaNode> _right;  // pointer to the second transition (only possible in the case of eps transition)
+  bool _eps;                        // true if the node has epsilon transition(s)
+  char _symbol;                     // symbol of the transition, if transition is not eps
+  size_t _id;                       // id of a node, node with id = 1 is the starting node
   bool _was_set{true};  // this boolean is used in setting node ids and printing, to ensure that a single node isnt
                         // affected more than once
 
@@ -225,8 +227,8 @@ class NfaStructure {
 
  public:
   NfaStructure() : _num_of_nodes(0) {}
-  const SPNfaNode& getStart() { return _start; }
-  const SPNfaNode& getFinal() { return _final; }
+  const SPNfaNode& getStart() const { return _start; }
+  const SPNfaNode& getFinal() const { return _final; }
   bool isFinal(const SPNfaNode& node) { return _final == node; }
   void setStart(const SPNfaNode& node) { _start = node; }
   void setFinal(const SPNfaNode& node) { _final = node; }
@@ -284,6 +286,7 @@ class NfaStructure {
     }
   }
 };
+
 class TransformReToNfa {
  public:
   TransformReToNfa() {}
@@ -371,40 +374,105 @@ class TransformReToNfa {
   }
 };
 
-struct custom_compare final {
-  bool operator()(const SPNfaNode& left, const SPNfaNode& right) const { return left->getId() < right->getId(); }
-};
+// struct custom_compare final {
+//   bool operator()(const SPNfaNode& left, const SPNfaNode& right) const { return left->getId() < right->getId(); }
+// };
 
-class DfaState : public std::set<SPNfaNode, custom_compare> {
+class DfaState {
+  std::set<SPNfaNode> _states;
+  // std::set<SPNfaNode, custom_compare> _states;
+  std::vector<std::pair<char, DfaState>> _possible_moves;
+
  public:
   DfaState move(const char& symbol) {
     DfaState state;
-    for (const auto& node : *this) {
+    for (const auto& node : _states) {
       if (!node->isEpsilon() && node->getSymbol() == symbol) {
-        state.insert(node);
+        state._states.insert(node->getLeft());
       }
     }
+    _possible_moves.push_back(std::make_pair(symbol, state));
     return state;
   }
   DfaState epsilonClosure() {
     DfaState state = *this;
     while (true) {
       DfaState temp = state;
-      for (const auto& node : state) {
+      for (const auto& node : state._states) {
+        if (node == nullptr) continue;
+
         if (node->isEpsilon()) {
-          state.insert(node->getLeft());
-          if (node->getRight()) state.insert(node->getRight());
+          state._states.insert(node->getLeft());
+          if (node->getRight()) state._states.insert(node->getRight());
         }
       }
-      if (temp.size() == state.size()) break;
+      if (temp._states.size() == state._states.size()) break;
     }
     return state;
   }
+  std::set<char> possibleMoves() {
+    std::set<char> moves;
+    for (const auto& node : _states) {
+      if (node == nullptr) continue;
+      if (!node->isEpsilon() && node->getLeft() != nullptr) {
+        moves.insert(node->getSymbol());
+      }
+    }
+    return moves;
+  }
+
+  bool contains(const SPNfaNode& node) {
+    const auto& ret = _states.find(node);
+    return ret != _states.end();
+  }
+  bool insert(const SPNfaNode& node) { return _states.insert(node).second; }
+
+  bool operator<(const DfaState& rhs) const { return _states.size() < rhs._states.size(); }
+  bool operator==(const DfaState& rhs) const { return this->_states == rhs._states; }
+  bool operator!=(const DfaState& rhs) const { return this->_states != rhs._states; }
 };
 
+typedef std::shared_ptr<DfaState> SPDfaState;
+
 class DFA {
-  DfaState _start;
-  DfaState _finish;
+  SPDfaState _start;
+  std::set<SPDfaState> _finish_states;
+  SPNfaNode _final_node;
+  std::set<SPDfaState> _all;
+
+  DFA() {}
+  bool containsState(const DfaState& state) {
+    for (const auto& it : _all) {
+      if (*it == state) return true;
+    }
+    return false;
+  }
+  void insert(const SPDfaState& state) {
+    if (!_all.insert(state).second) return;
+    if (state->contains(_final_node)) {
+      _finish_states.insert(state);
+    }
+    auto moves = state->possibleMoves();
+    for (const auto& symbol : moves) {
+      auto move_state = state->move(symbol);
+      if (!containsState(move_state)) {
+        insert(std::make_shared<DfaState>(move_state));
+      }
+    }
+  }
+
+ public:
+  static DFA generateDFA(const NfaStructure& nfa) {
+    DFA dfa;
+    if (nfa.getStart() == nullptr) return dfa;
+    dfa._final_node = nfa.getFinal();
+    auto temp = std::make_shared<DfaState>();
+    temp->insert(nfa.getStart());
+    *temp = temp->epsilonClosure();
+    dfa._start = std::move(temp);
+    dfa.insert(dfa._start);
+    return dfa;
+  }
 };
 
 int main(int argc, char** argv) {
@@ -426,6 +494,17 @@ int main(int argc, char** argv) {
   }
   auto tree = *nfa.data;
   tree.print();
+
+  DfaState start;
+  start.insert(tree.getStart());
+  auto eps = start.epsilonClosure();
+  auto move_a = eps.move('a');
+
+  // for (const auto& node : move_a) {
+  //   std::cout << node->getId() << std::endl;
+  // }
+
+  auto final = DFA::generateDFA(tree);
 
   return 1;
 }
