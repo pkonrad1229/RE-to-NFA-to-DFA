@@ -1,7 +1,3 @@
-//
-// Created by konrad on 23.04.22.
-//
-
 #pragma once
 
 #include "reg_exp.h"
@@ -52,8 +48,15 @@ class NfaStructure {
   size_t& getSize() { return _num_of_nodes; }
   void increaseAllIds(const size_t& num);
   static ErrOr<NfaStructure> generateNfaFromExpression(const SPExpression& expr);
+  void increaseIds(const SPNfaNode& root, const size_t& num);
+  void setWasIncreased(const SPNfaNode& root);
+
+  void print(const SPNfaNode& root);
 
  public:
+  /**
+   * Function that prints the Nfa Structure
+   */
   void print();
 
   [[nodiscard]] const SPNfaNode& getStart() const { return _start; }
@@ -65,13 +68,4 @@ class NfaStructure {
    * @return a NfaStructure, or error
    */
   static ErrOr<NfaStructure> generateNfaFromRE(const std::string& expression);
-
- private:
-  void increaseIds(const SPNfaNode& root, const size_t& num);
-  void setWasIncreased(const SPNfaNode& root);
-  /**
-   * Function that prints the Nfa Structure
-   * @param root root of the structure
-   */
-  void print(const SPNfaNode& root);
 };
