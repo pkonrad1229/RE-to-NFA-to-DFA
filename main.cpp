@@ -374,16 +374,19 @@ class TransformReToNfa {
   }
 };
 
-// struct custom_compare final {
-//   bool operator()(const SPNfaNode& left, const SPNfaNode& right) const { return left->getId() < right->getId(); }
-// };
-
 class DfaState {
   std::set<SPNfaNode> _states;
-  // std::set<SPNfaNode, custom_compare> _states;
-  std::vector<std::pair<char, DfaState>> _possible_moves;
+  std::vector<std::pair<char, std::set<size_t>>> _possible_moves;
+  bool _is_final;
+  char _state_name;
 
  public:
+  DfaState() : _is_final(false), _state_name(' ') {}
+
+  bool isFinal() const { return _is_final; }
+  void setFinal(bool val) { _is_final = val; }
+  char getName() const { return _state_name; }
+  void setName(char val) { _state_name = val; }
   DfaState move(const char& symbol) {
     DfaState state;
     for (const auto& node : _states) {
@@ -391,7 +394,8 @@ class DfaState {
         state._states.insert(node->getLeft());
       }
     }
-    _possible_moves.push_back(std::make_pair(symbol, state));
+
+    _possible_moves.push_back(std::make_pair(symbol, state.epsilonClosure().getIds()));
     return state;
   }
   DfaState epsilonClosure() {
@@ -425,34 +429,54 @@ class DfaState {
     const auto& ret = _states.find(node);
     return ret != _states.end();
   }
+  void printIds() const {
+    std::cout << "{";
+    for (const auto& state : _states) {
+      std::cout << " " << state->getId();
+    }
+    std::cout << " }";
+  }
+  std::set<size_t> getIds() const {
+    std::set<size_t> ids;
+    for (const auto& state : _states) {
+      ids.insert(state->getId());
+    }
+    return ids;
+  }
   bool insert(const SPNfaNode& node) { return _states.insert(node).second; }
 
-  bool operator<(const DfaState& rhs) const { return _states.size() < rhs._states.size(); }
-  bool operator==(const DfaState& rhs) const { return this->_states == rhs._states; }
-  bool operator!=(const DfaState& rhs) const { return this->_states != rhs._states; }
+  std::vector<std::pair<char, std::set<size_t>>> getMoves() const { return _possible_moves; }
 };
 
 typedef std::shared_ptr<DfaState> SPDfaState;
 
 class DFA {
   SPDfaState _start;
-  std::set<SPDfaState> _finish_states;
   SPNfaNode _final_node;
+  SPNfaNode _trap_state;
   std::set<SPDfaState> _all;
+  std::set<char> _all_moves;
+  char _current_name = 'A';
 
   DFA() {}
+
   bool containsState(const DfaState& state) {
     for (const auto& it : _all) {
-      if (*it == state) return true;
+      if (it->getIds() == state.getIds()) return true;
     }
     return false;
   }
+
   void insert(const SPDfaState& state) {
-    if (!_all.insert(state).second) return;
+    *state = state->epsilonClosure();
+    if (containsState(*state)) return;
+    _all.insert(state);
+    state->setName(_current_name++);
     if (state->contains(_final_node)) {
-      _finish_states.insert(state);
+      state->setFinal(true);
     }
     auto moves = state->possibleMoves();
+    _all_moves.insert(moves.begin(), moves.end());
     for (const auto& symbol : moves) {
       auto move_state = state->move(symbol);
       if (!containsState(move_state)) {
@@ -461,8 +485,15 @@ class DFA {
     }
   }
 
+  char getStateName(const std::set<size_t>& ids) {
+    for (const auto& state : _all) {
+      if (ids == state->getIds()) return state->getName();
+    }
+    return ' ';
+  }
+
  public:
-  static DFA generateDFA(const NfaStructure& nfa) {
+  static DFA generateDFAfromNFA(const NfaStructure& nfa) {
     DFA dfa;
     if (nfa.getStart() == nullptr) return dfa;
     dfa._final_node = nfa.getFinal();
@@ -473,38 +504,87 @@ class DFA {
     dfa.insert(dfa._start);
     return dfa;
   }
+
+  static ErrOr<DFA> generateDFAfromRE(const std::string expression) {
+    RegExpParser parser;
+    auto ret = parser.parseExpression(expression);
+    if (ret.err) {
+      cout << "RE error :" << ret.err.value().msg << endl;
+      return *ret.err;
+    }
+    TransformReToNfa transform;
+    auto nfa = transform.transform(ret.data.value().second);
+    if (nfa.err) {
+      cout << "NFA error :" << nfa.err.value().msg << endl;
+      return *nfa.err;
+    }
+    return generateDFAfromNFA(nfa.data.value());
+  }
+
+  void print() {
+    std::cout << "   |";
+    for (const auto& val : _all_moves) {
+      std::cout << " "
+                << "\033[1;31m" << val << "\033[0m"
+                << " |";
+    }
+    std::cout << std::endl;
+    std::cout << "---|";
+    for (const auto& val : _all_moves) {
+      std::cout << "---|";
+    }
+    std::cout << std::endl;
+    for (const auto& state : _all) {
+      if (state->isFinal()) {
+        std::cout << " "
+                  << "\033[1;31m" << state->getName() << "\033[0m"
+                  << " |";
+      } else {
+        std::cout << " " << state->getName() << " |";
+      }
+
+      for (const auto& val : _all_moves) {
+        bool was_set = false;
+        for (const auto& mv : state->getMoves()) {
+          if (mv.first == val) {
+            std::cout << " " << getStateName(mv.second) << " |";
+            was_set = true;
+            break;
+          }
+        }
+        if (!was_set) {
+          std::cout << " " << _current_name << " |";
+        }
+      }
+      std::cout << std::endl;
+      std::cout << "---|";
+      for (const auto& val : _all_moves) {
+        std::cout << "---|";
+      }
+      std::cout << std::endl;
+    }
+    std::cout << " " << _current_name << " |";
+    for (const auto& val : _all_moves) {
+      std::cout << " " << _current_name << " |";
+    }
+    std::cout << std::endl;
+    std::cout << "---|";
+    for (const auto& val : _all_moves) {
+      std::cout << "---|";
+    }
+    std::cout << std::endl;
+  }
 };
 
 int main(int argc, char** argv) {
   if (argc != 2) return 0;
 
   string expression = argv[1];
-  RegExpParser parser;
-  auto ret = parser.parseExpression(expression);
-  if (ret.err) {
-    cout << "RE error :" << ret.err.value().msg << endl;
-    return 0;
+
+  auto final = DFA::generateDFAfromRE(expression);
+  if (!final.err) {
+    final.data.value().print();
   }
-  ret.data.value().second->printTree();
-  TransformReToNfa transform;
-  auto nfa = transform.transform(ret.data.value().second);
-  if (nfa.err) {
-    cout << "NFA error :" << nfa.err.value().msg << endl;
-    return 0;
-  }
-  auto tree = *nfa.data;
-  tree.print();
-
-  DfaState start;
-  start.insert(tree.getStart());
-  auto eps = start.epsilonClosure();
-  auto move_a = eps.move('a');
-
-  // for (const auto& node : move_a) {
-  //   std::cout << node->getId() << std::endl;
-  // }
-
-  auto final = DFA::generateDFA(tree);
 
   return 1;
 }
