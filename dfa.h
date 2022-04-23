@@ -85,13 +85,14 @@ class DFA {
   /**
    * Function that checks if given state is in the DFA
    * @param state DFA state
-   * @return true if node was inserted, false if the node was already contained by the state
+   * @return true if state exists in the DFA
    */
   bool containsState(const DfaState& state);
 
   /**
    * Function that inserts a state to the DFA
    * @param state shared pointer to a DFA state
+   * @return true if node was inserted, false if the node was already contained by the state
    */
   void insert(const SPDfaState& state);
 
@@ -101,6 +102,7 @@ class DFA {
    * @return name of the state
    */
   char getStateName(const std::set<size_t>& ids);
+  bool parseExpression(std::string expression, const SPDfaState& state);
 
  public:
   /**
@@ -118,4 +120,11 @@ class DFA {
   static ErrOr<DFA> generateDfaFromRE(const std::string& expression);
 
   void print();
+
+  /**
+   * Function that checks if given string is accepted by the DFA
+   * @param expression string with the expression
+   * @return true, if string can be accepted
+   */
+  bool parseExpression(const std::string& expression);
 };

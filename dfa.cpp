@@ -104,19 +104,19 @@ DFA DFA::generateDfaFromNfa(const NfaStructure& nfa) {
 ErrOr<DFA> DFA::generateDfaFromRE(const std::string& expression) {
   auto nfa = NfaStructure::generateNfaFromRE(expression);
   if (nfa.err) {
-    std::cout << "NFA error :" << nfa.err.value().msg << std::endl;
     return *nfa.err;
   }
   return generateDfaFromNfa(nfa.data.value());
 }
 void DFA::print() {
-  std::cout << "in the first row, all possible moves are printed\nin the first column all states are listed. State A "
-               "is the starting state, and all states written with color \033[1;31mred\033[0m are the final states\n";
+  std::cout << "Printing DFA transition table\nIn the first row, all possible moves are printed\nIn the first column "
+               "all states are listed. State A "
+               "is the starting state, and all states written with color \033[1;31mred\033[0m are the final states\n\n";
   bool trap_state = false;
   std::cout << "   |";
   for (const auto& val : _all_moves) {
     std::cout << " "
-              << "\033[1;31m" << val << "\033[0m"
+              << "\033[1;33m" << val << "\033[0m"
               << " |";
   }
   std::cout << std::endl;
@@ -127,11 +127,9 @@ void DFA::print() {
   std::cout << std::endl;
   for (const auto& state : _all) {
     if (state->isFinal()) {
-      std::cout << " "
-                << "\033[1;31m" << state->getName() << "\033[0m"
-                << " |";
+      std::cout << " \033[1;31m" << state->getName() << "\033[0m |";
     } else {
-      std::cout << " " << state->getName() << " |";
+      std::cout << " \033[1;33m" << state->getName() << "\033[0m |";
     }
 
     for (const auto& val : _all_moves) {
@@ -165,6 +163,23 @@ void DFA::print() {
     for (const auto& val : _all_moves) {
       std::cout << "---|";
     }
-    std::cout << std::endl;
+    std::cout << "\n";
   }
+  std::cout << "\n";
+}
+
+bool DFA::parseExpression(const std::string& expression) { return parseExpression(expression, _start); }
+
+bool DFA::parseExpression(std::string expression, const SPDfaState& state) {
+  if (expression.empty()) return state->isFinal();
+  auto curr = expression.at(0);
+  for (const auto& move : state->getMoves()) {
+    if (move.first == curr) {
+      expression.erase(0, 1);
+      for (const auto& temp : _all) {
+        if (temp->getIds() == move.second) return parseExpression(expression, temp);
+      }
+    }
+  }
+  return false;
 }

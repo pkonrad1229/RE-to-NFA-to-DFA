@@ -106,7 +106,6 @@ ErrOr<NfaStructure> NfaStructure::generateNfaFromRE(const std::string& expressio
   RegExpParser parser;
   auto ret = parser.parseExpression(expression);
   if (ret.err) {
-    std::cout << "RE error :" << ret.err.value().msg << std::endl;
     return *ret.err;
   }
   return generateNfaFromExpression(ret.data.value().second);
