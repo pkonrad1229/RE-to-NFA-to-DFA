@@ -1,3 +1,6 @@
 .vscode/
 .clang-format
 main
+.idea/
+*.o
+output
