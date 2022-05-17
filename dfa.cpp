@@ -101,11 +101,12 @@ DFA DFA::generateDfaFromNfa(const NfaStructure& nfa) {
   dfa.insert(dfa._start);
   return dfa;
 }
-ErrOr<DFA> DFA::generateDfaFromRE(const std::string& expression) {
-  auto nfa = NfaStructure::generateNfaFromRE(expression);
+ErrOr<DFA> DFA::generateDfaFromRE(const std::string& expression, bool print) {
+  auto nfa = NfaStructure::generateNfaFromRE(expression, print);
   if (nfa.err) {
     return *nfa.err;
   }
+  if (print) (*nfa.data).print();
   return generateDfaFromNfa(nfa.data.value());
 }
 void DFA::print() {

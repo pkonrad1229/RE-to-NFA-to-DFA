@@ -1,35 +1,35 @@
 #include "reg_exp.h"
 
-Expression::Expression(char value) : _type(NodeType::Value), _value(value) {}
+Expression::Expression(char value) : _type(ExprssionType::Value), _value(value) {}
 const std::shared_ptr<Expression>& Expression::getLeft() { return _left; }
 const std::shared_ptr<Expression>& Expression::getRight() { return _right; }
-void Expression::starRightSide() { _right = std::make_shared<Expression>(NodeType::Star, std::move(_right)); }
+void Expression::starRightSide() { _right = std::make_shared<Expression>(ExprssionType::Star, std::move(_right)); }
 void Expression::printTree(const std::string& prefix, bool is_right) {
   std::cout << prefix;
   std::cout << (is_right ? "|--" : "L--");
   switch (_type) {
-    case NodeType::Value: {
+    case ExprssionType::Value: {
       std::cout << _value << std::endl;
       break;
     }
-    case NodeType::Add: {
-      std::cout << '+' << std::endl;
+    case ExprssionType::Add: {
+      std::cout << "\033[1;33mAdd\033[0m" << std::endl;
       _left->printTree(prefix + (is_right ? "|   " : "    "), true);
       _right->printTree(prefix + (is_right ? "|   " : "    "), false);
       break;
     }
-    case NodeType::Star: {
-      std::cout << '*' << std::endl;
+    case ExprssionType::Star: {
+      std::cout << "\033[1;33mStar\033[0m" << std::endl;
       _left->printTree(prefix + (is_right ? "|   " : "    "), false);
       break;
     }
-    case NodeType::Brackets: {
-      std::cout << "()" << std::endl;
+    case ExprssionType::Brackets: {
+      std::cout << "\033[1;33mBrackets\033[0m" << std::endl;
       _left->printTree(prefix + (is_right ? "|   " : "    "), false);
       break;
     }
-    case NodeType::Or: {
-      std::cout << '|' << std::endl;
+    case ExprssionType::Or: {
+      std::cout << "\033[1;33mOr\033[0m" << std::endl;
       _left->printTree(prefix + (is_right ? "|   " : "    "), true);
       _right->printTree(prefix + (is_right ? "|   " : "    "), false);
       break;
@@ -48,16 +48,16 @@ ErrOr<std::pair<std::string, SPExpression>> RegExpParser::parseExpression(std::s
       case '*': {
         if (curr == nullptr) return ERROR_WITH_FILE("KLEENE CLOSURE called without anything before");
         switch (curr->getType()) {
-          case NodeType::Star: {
+          case ExprssionType::Star: {
             return ERROR_WITH_FILE("KLEENE CLOSURE operators cannot be nested");
           }
-          case NodeType::Brackets:
-          case NodeType::Value: {
-            curr = std::make_shared<Expression>(NodeType::Star, std::move(curr));
+          case ExprssionType::Brackets:
+          case ExprssionType::Value: {
+            curr = std::make_shared<Expression>(ExprssionType::Star, std::move(curr));
             break;
           }
-          case NodeType::Add:
-          case NodeType::Or: {
+          case ExprssionType::Add:
+          case ExprssionType::Or: {
             curr->starRightSide();
             break;
           }
@@ -76,9 +76,9 @@ ErrOr<std::pair<std::string, SPExpression>> RegExpParser::parseExpression(std::s
         if (expression.empty() || expression.at(0) != ')') {
           return ERROR_WITH_FILE("bracket not closed");
         }
-        auto temp = std::make_shared<Expression>(NodeType::Brackets, std::move(ret.data.value().second));
+        auto temp = std::make_shared<Expression>(ExprssionType::Brackets, std::move(ret.data.value().second));
         curr == nullptr ? curr = std::move(temp)
-                        : curr = std::make_shared<Expression>(NodeType::Add, std::move(curr), std::move(temp));
+                        : curr = std::make_shared<Expression>(ExprssionType::Add, std::move(curr), std::move(temp));
 
         break;
       }
@@ -100,13 +100,13 @@ ErrOr<std::pair<std::string, SPExpression>> RegExpParser::parseExpression(std::s
         if (rhs == nullptr) {
           return ERROR_WITH_FILE("OR expression rhs is empty");
         }
-        curr = std::make_shared<Expression>(NodeType::Or, std::move(curr), std::move(rhs));
+        curr = std::make_shared<Expression>(ExprssionType::Or, std::move(curr), std::move(rhs));
         return std::make_pair(expression, std::move(curr));
       }
       default: {
         auto temp = std::make_shared<Expression>(expression.at(0));
         curr == nullptr ? curr = std::move(temp)
-                        : curr = std::make_shared<Expression>(NodeType::Add, std::move(curr), std::move(temp));
+                        : curr = std::make_shared<Expression>(ExprssionType::Add, std::move(curr), std::move(temp));
         break;
       }
     }

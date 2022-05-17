@@ -16,6 +16,7 @@ template <typename T>
 struct ErrOr {
   OErr err;
   std::optional<T> data;
+  bool error_happened;
 
   ErrOr() = default;
   ErrOr(const Error& err) : err(err) {}

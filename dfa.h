@@ -75,7 +75,6 @@ typedef std::shared_ptr<DfaState> SPDfaState;
 class DFA {
   SPDfaState _start;
   SPNfaNode _final_node;
-  SPNfaNode _trap_state;
   std::set<SPDfaState> _all;
   std::set<char> _all_moves;
   char _current_name = 'A';
@@ -117,7 +116,7 @@ class DFA {
    * @param expression string with the expression
    * @return DFA or error
    */
-  static ErrOr<DFA> generateDfaFromRE(const std::string& expression);
+  static ErrOr<DFA> generateDfaFromRE(const std::string& expression, bool print = false);
 
   void print();
 

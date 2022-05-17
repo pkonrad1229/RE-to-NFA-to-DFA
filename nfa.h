@@ -67,5 +67,5 @@ class NfaStructure {
    * @param expression string with the RE
    * @return a NfaStructure, or error
    */
-  static ErrOr<NfaStructure> generateNfaFromRE(const std::string& expression);
+  static ErrOr<NfaStructure> generateNfaFromRE(const std::string& expression, bool print = false);
 };

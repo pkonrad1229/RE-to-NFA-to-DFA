@@ -24,7 +24,7 @@ void NfaStructure::setWasIncreased(const SPNfaNode& root) {
 }
 
 ErrOr<NfaStructure> NfaStructure::generateNfaFromExpression(const SPExpression& expr) {
-  if (expr->getType() == NodeType::Value) {
+  if (expr->getType() == ExprssionType::Value) {
     NfaStructure nfa;
     auto temp = std::make_shared<NfaNode>(std::make_shared<NfaNode>(), expr->getValue());
     temp->setId(1);
@@ -39,7 +39,7 @@ ErrOr<NfaStructure> NfaStructure::generateNfaFromExpression(const SPExpression& 
   if (ret.err) return *ret.err;
   auto nfa = *ret.data;
   switch (expr->getType()) {
-    case NodeType::Add: {
+    case ExprssionType::Add: {
       ret = generateNfaFromExpression(expr->getRight());
       if (ret.err) return *ret.err;
       auto rhs = *ret.data;
@@ -49,10 +49,10 @@ ErrOr<NfaStructure> NfaStructure::generateNfaFromExpression(const SPExpression& 
       nfa.setFinal(rhs.getFinal());
       return std::move(nfa);
     }
-    case NodeType::Brackets: {
+    case ExprssionType::Brackets: {
       return std::move(nfa);
     }
-    case NodeType::Star: {
+    case ExprssionType::Star: {
       auto final = std::make_shared<NfaNode>();
       auto start = std::make_shared<NfaNode>(nfa.getStart(), final);
 
@@ -69,7 +69,7 @@ ErrOr<NfaStructure> NfaStructure::generateNfaFromExpression(const SPExpression& 
 
       return std::move(nfa);
     }
-    case ::NodeType::Or: {
+    case ::ExprssionType::Or: {
       ret = generateNfaFromExpression(expr->getRight());
       if (ret.err) return *ret.err;
       auto rhs = *ret.data;
@@ -102,11 +102,16 @@ ErrOr<NfaStructure> NfaStructure::generateNfaFromExpression(const SPExpression& 
   }
 }
 
-ErrOr<NfaStructure> NfaStructure::generateNfaFromRE(const std::string& expression) {
+ErrOr<NfaStructure> NfaStructure::generateNfaFromRE(const std::string& expression, bool print) {
   RegExpParser parser;
   auto ret = parser.parseExpression(expression);
   if (ret.err) {
     return *ret.err;
+  }
+  if (print) {
+    std::cout << "\nPrinting the parsed expression\n\n";
+    ret.data.value().second->printTree();
+    std::cout << "\n";
   }
   return generateNfaFromExpression(ret.data.value().second);
 }
@@ -131,10 +136,11 @@ void NfaStructure::print(const SPNfaNode& root) {
   }
 }
 void NfaStructure::print() {
+  std::cout << "Printing desctription of NFA states\n\n";
   setWasIncreased(_start);
   std::cout << "STARTING NODE ";
   print(_start);
-  std::cout << "FINAL NODE id: " << _final->getId() << std::endl;
+  std::cout << "FINAL NODE id: " << _final->getId() << "\n\n";
 }
 void NfaStructure::increaseAllIds(const size_t& num) {
   setWasIncreased(_start);

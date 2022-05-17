@@ -57,10 +57,14 @@ void testAll() {
   testParsingV1();
   testParsingV2();
   generatingTest("(aa|b*a)*|(123|bc*d)");
+  generatingTest("(((a|b)*)*)*|1*2(1*|2*)*");
+  generatingTest("(((a|b)*)*)*");
   generatingTest("(aa)*|");
+  generatingTest("a**");
   generatingTest("|abcd");
   generatingTest("*aa");
   generatingTest("(aa)*|()");
+  generatingTest("()*");
 }
 
 void printHelp() {
@@ -82,7 +86,7 @@ int main(int argc, char** argv) {
     }
     std::string expression = argv[2];
     std::cout << "\033[1;33m--- Generating DFA for RE \033[1;36m" << expression << "\033[1;33m ---\033[0m\n";
-    auto ret = DFA::generateDfaFromRE(expression);
+    auto ret = DFA::generateDfaFromRE(expression, true);
     if (ret.err) {
       std::cout << "\033[1;31mERROR, DFA could not be created becasue: \033[0;31m" << (*ret.err).msg << "\033[0m\n";
       return 0;
