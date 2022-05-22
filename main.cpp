@@ -43,6 +43,35 @@ void testParsingV2() {
   str = "b";
   std::cout << str << (dfa.parseExpression(str) ? " correct\n" : " incorrect\n");
 }
+
+void testParsingV3() {
+  std::cout << "\033[1;33m--- Parsing test for RE "
+               "\033[1;36m(1|2|3|4|5|6|7|8|9|0)(1|2|3|4|5|6|7|8|9|0)-(1|2|3|4|5|6|7|8|9|0)(1|2|3|4|5|6|7|8|9|0)-(1|"
+               "2|3|4|5|6|7|8|9|0)*\033[1;33m ---\033[0m\n";
+  auto ret = DFA::generateDfaFromRE(
+      "(1|2|3|4|5|6|7|8|9|0)(1|2|3|4|5|6|7|8|9|0)-(1|2|3|4|5|6|7|8|9|0)(1|2|3|4|5|6|7|8|9|0)-(1|"
+      "2|3|4|5|6|7|8|9|0)*");
+  if (ret.err) {
+    std::cout << "\033[1;31mERROR, DFA could not be created\033[0m\n";
+  }
+  auto dfa = *ret.data;
+  auto str = "05-12-1999";
+  std::cout << str << (dfa.parseExpression(str) ? " correct\n" : " incorrect\n");
+  str = "05-11-123";
+  std::cout << str << (dfa.parseExpression(str) ? " correct\n" : " incorrect\n");
+  str = "01-02-3";
+  std::cout << str << (dfa.parseExpression(str) ? " correct\n" : " incorrect\n");
+  str = "00-00-00";
+  std::cout << str << (dfa.parseExpression(str) ? " correct\n" : " incorrect\n");
+  str = "11-2-3";
+  std::cout << str << (dfa.parseExpression(str) ? " correct\n" : " incorrect\n");
+  str = "1-22-33";
+  std::cout << str << (dfa.parseExpression(str) ? " correct\n" : " incorrect\n");
+  str = "11-22--33";
+  std::cout << str << (dfa.parseExpression(str) ? " correct\n" : " incorrect\n");
+  str = "a1-22-33";
+  std::cout << str << (dfa.parseExpression(str) ? " correct\n" : " incorrect\n");
+}
 void generatingTest(const std::string& expression) {
   std::cout << "\033[1;33m--- Generating DFA for RE \033[1;36m" << expression << "\033[1;33m ---\033[0m\n";
   auto ret = DFA::generateDfaFromRE(expression);
@@ -56,15 +85,26 @@ void generatingTest(const std::string& expression) {
 void testAll() {
   testParsingV1();
   testParsingV2();
+  testParsingV3();
   generatingTest("(aa|b*a)*|(123|bc*d)");
   generatingTest("(((a|b)*)*)*|1*2(1*|2*)*");
   generatingTest("(((a|b)*)*)*");
-  generatingTest("(aa)*|");
   generatingTest("a**");
+  generatingTest("(((a*|(bc)*d)|123*)OR(E*F*g|hi(Jk)*)lMnOp)*qrS (PuVW|xYz)*");
+  generatingTest("((((((a))))*|(((((d)))*))))");
+  generatingTest(
+      "(1|2|3|4|5|6|7|8|9|0)*(1|2|3|4|5|6|7|8|9|0)*(1|2|3|4|5|6|7|8|9|0)*(1|2|3|4|5|6|7|8|9|0)*(1|2|3|4|5|6|7|8|9|0)*");
+
+  generatingTest("(aa)*|");
   generatingTest("|abcd");
   generatingTest("*aa");
   generatingTest("(aa)*|()");
   generatingTest("()*");
+  generatingTest("((ab|cd*)ef|g12(123)*");
+  generatingTest("ab(|123)");
+  generatingTest("ab(123|)");
+  generatingTest("ab|(123|456)*||d");
+  generatingTest("ab*|*");
 }
 
 void printHelp() {

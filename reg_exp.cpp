@@ -49,7 +49,7 @@ ErrOr<std::pair<std::string, SPExpression>> RegExpParser::parseExpression(std::s
         if (curr == nullptr) return ERROR_WITH_FILE("KLEENE CLOSURE called without anything before");
         switch (curr->getType()) {
           case ExprssionType::Star: {
-            return ERROR_WITH_FILE("KLEENE CLOSURE operators cannot be nested");
+            break;
           }
           case ExprssionType::Brackets:
           case ExprssionType::Value: {
@@ -76,7 +76,13 @@ ErrOr<std::pair<std::string, SPExpression>> RegExpParser::parseExpression(std::s
         if (expression.empty() || expression.at(0) != ')') {
           return ERROR_WITH_FILE("bracket not closed");
         }
-        auto temp = std::make_shared<Expression>(ExprssionType::Brackets, std::move(ret.data.value().second));
+        auto expr = ret.data.value().second;
+        if (!expr) return ERROR_WITH_FILE("empty statement inside brackets is not allowed");
+        std::shared_ptr<Expression> temp;
+        if (expr->getType() == ExprssionType::Brackets)
+          temp = std::move(expr);
+        else
+          temp = std::make_shared<Expression>(ExprssionType::Brackets, std::move(expr));
         curr == nullptr ? curr = std::move(temp)
                         : curr = std::make_shared<Expression>(ExprssionType::Add, std::move(curr), std::move(temp));
 
