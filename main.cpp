@@ -3,10 +3,10 @@
 #include "dfa.h"
 
 void testParsingV1() {
-  std::cout << "\033[1;33m--- Parsing test for RE \033[1;36m(a|b)*abb\033[1;33m ---\033[0m\n";
+  std::cout << YELLOW << "--- Parsing test for RE " << CYAN << "(a|b)*abb" << YELLOW << " ---" << RESET << "\n";
   auto ret = DFA::generateDfaFromRE("(a|b)*abb");
   if (ret.err) {
-    std::cout << "\033[1;31mERROR, DFA could not be created\033[0m\n";
+    std::cout << RED << "ERROR, DFA could not be created" << RESET << "\n";
   }
   auto dfa = *ret.data;
   auto str = "abb";
@@ -24,10 +24,10 @@ void testParsingV1() {
 }
 
 void testParsingV2() {
-  std::cout << "\033[1;33m--- Parsing test for RE \033[1;36m(ab*|123)|bba*\033[1;33m ---\033[0m\n";
+  std::cout << YELLOW << "--- Parsing test for RE " << CYAN << "(ab*|123)|bba*" << YELLOW << " ---" << RESET << "\n";
   auto ret = DFA::generateDfaFromRE("(ab*|123)|bba*");
   if (ret.err) {
-    std::cout << "\033[1;31mERROR, DFA could not be created\033[0m\n";
+    std::cout << RED << "ERROR, DFA could not be created" << RESET << "\n";
   }
   auto dfa = *ret.data;
   auto str = "123";
@@ -45,14 +45,18 @@ void testParsingV2() {
 }
 
 void testParsingV3() {
-  std::cout << "\033[1;33m--- Parsing test for RE "
-               "\033[1;36m(1|2|3|4|5|6|7|8|9|0)(1|2|3|4|5|6|7|8|9|0)-(1|2|3|4|5|6|7|8|9|0)(1|2|3|4|5|6|7|8|9|0)-(1|"
-               "2|3|4|5|6|7|8|9|0)*\033[1;33m ---\033[0m\n";
+  std::cout << YELLOW
+            << "--- Parsing test for RE "
+               ""
+            << CYAN
+            << "(1|2|3|4|5|6|7|8|9|0)(1|2|3|4|5|6|7|8|9|0)-(1|2|3|4|5|6|7|8|9|0)(1|2|3|4|5|6|7|8|9|0)-(1|"
+               "2|3|4|5|6|7|8|9|0)*"
+            << YELLOW << " ---" << RESET << "\n";
   auto ret = DFA::generateDfaFromRE(
       "(1|2|3|4|5|6|7|8|9|0)(1|2|3|4|5|6|7|8|9|0)-(1|2|3|4|5|6|7|8|9|0)(1|2|3|4|5|6|7|8|9|0)-(1|"
       "2|3|4|5|6|7|8|9|0)*");
   if (ret.err) {
-    std::cout << "\033[1;31mERROR, DFA could not be created\033[0m\n";
+    std::cout << RED << "ERROR, DFA could not be created" << RESET << "\n";
   }
   auto dfa = *ret.data;
   auto str = "05-12-1999";
@@ -73,13 +77,27 @@ void testParsingV3() {
   std::cout << str << (dfa.parseExpression(str) ? " correct\n" : " incorrect\n");
 }
 void generatingTest(const std::string& expression) {
-  std::cout << "\033[1;33m--- Generating DFA for RE \033[1;36m" << expression << "\033[1;33m ---\033[0m\n";
+  std::cout << YELLOW << "--- Generating DFA for RE " << CYAN << "" << expression << YELLOW << " ---" << RESET << "\n";
   auto ret = DFA::generateDfaFromRE(expression);
   if (ret.err) {
-    std::cout << "\033[1;31mERROR, DFA could not be created becasue: \033[0;31m" << (*ret.err).msg << "\033[0m\n";
+    std::cout << RED << "ERROR, DFA could not be created becasue: " << SMALLRED << (*ret.err).msg << "" << RESET
+              << "\n";
     return;
   }
-  std::cout << "\033[1;32m--- DFA generated correctly ---\033[0m\n";
+  std::cout << GREEN << "--- DFA generated correctly ---" << RESET << "\n";
+}
+
+void creationTest(const std::string& expression) {
+  std::cout << YELLOW << "--- Step-by-step DFA creation for RE " << CYAN << "" << expression << YELLOW << " ---"
+            << RESET << "\n";
+  auto ret = DFA::generateDfaFromRE(expression, true);
+  if (ret.err) {
+    std::cout << RED << "ERROR, DFA could not be created becasue: " << SMALLRED << (*ret.err).msg << "" << RESET
+              << "\n";
+    return;
+  }
+  auto dfa = *ret.data;
+  dfa.print();
 }
 
 void testAll() {
@@ -105,6 +123,9 @@ void testAll() {
   generatingTest("ab(123|)");
   generatingTest("ab|(123|456)*||d");
   generatingTest("ab*|*");
+
+  creationTest("(a|bc)*|12*3");
+  creationTest("((123)*4*|aBc)*");
 }
 
 void printHelp() {
@@ -125,17 +146,20 @@ int main(int argc, char** argv) {
       return 0;
     }
     std::string expression = argv[2];
-    std::cout << "\033[1;33m--- Generating DFA for RE \033[1;36m" << expression << "\033[1;33m ---\033[0m\n";
+    std::cout << YELLOW << "--- Generating DFA for RE " << CYAN << "" << expression << YELLOW << " ---" << RESET
+              << "\n";
     auto ret = DFA::generateDfaFromRE(expression, true);
     if (ret.err) {
-      std::cout << "\033[1;31mERROR, DFA could not be created becasue: \033[0;31m" << (*ret.err).msg << "\033[0m\n";
+      std::cout << RED << "ERROR, DFA could not be created becasue: " << SMALLRED << (*ret.err).msg << "" << RESET
+                << "\n";
       return 0;
     }
     auto dfa = *ret.data;
     dfa.print();
     std::string str(argv[3]);
     std::cout << "string '" << str
-              << (dfa.parseExpression(str) ? "' is\033[1;32m correct\033[0m\n" : "' is \033[1;31mincorrect\033[0m\n");
+              << (dfa.parseExpression(str) ? std::string("' is") + GREEN + " correct" + RESET + "\n"
+                                           : std::string("' is ") + RED + "incorrect" + RESET + "\n");
   } else if (flag == "-test") {
     if (argc != 2) {
       std::cout << " Incorrect number of parameters!\n";

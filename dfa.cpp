@@ -112,13 +112,12 @@ ErrOr<DFA> DFA::generateDfaFromRE(const std::string& expression, bool print) {
 void DFA::print() {
   std::cout << "Printing DFA transition table\nIn the first row, all possible moves are printed\nIn the first column "
                "all states are listed. State A "
-               "is the starting state, and all states written with color \033[1;31mred\033[0m are the final states\n\n";
+               "is the starting state, and all states written with color "
+            << RED << "red" << RESET << " are the final states\n\n";
   bool trap_state = false;
   std::cout << "   |";
   for (const auto& val : _all_moves) {
-    std::cout << " "
-              << "\033[1;33m" << val << "\033[0m"
-              << " |";
+    std::cout << " " << YELLOW << val << RESET << " |";
   }
   std::cout << std::endl;
   std::cout << "---|";
@@ -128,9 +127,9 @@ void DFA::print() {
   std::cout << std::endl;
   for (const auto& state : _all) {
     if (state->isFinal()) {
-      std::cout << " \033[1;31m" << state->getName() << "\033[0m |";
+      std::cout << " " << RED << state->getName() << RESET << " |";
     } else {
-      std::cout << " \033[1;33m" << state->getName() << "\033[0m |";
+      std::cout << " " << YELLOW << state->getName() << RESET << " |";
     }
 
     for (const auto& val : _all_moves) {

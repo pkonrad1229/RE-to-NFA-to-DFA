@@ -13,23 +13,23 @@ void Expression::printTree(const std::string& prefix, bool is_right) {
       break;
     }
     case ExprssionType::Add: {
-      std::cout << "\033[1;33mAdd\033[0m" << std::endl;
+      std::cout << YELLOW << "Add" << RESET << std::endl;
       _left->printTree(prefix + (is_right ? "|   " : "    "), true);
       _right->printTree(prefix + (is_right ? "|   " : "    "), false);
       break;
     }
     case ExprssionType::Star: {
-      std::cout << "\033[1;33mStar\033[0m" << std::endl;
+      std::cout << YELLOW << "Star" << RESET << std::endl;
       _left->printTree(prefix + (is_right ? "|   " : "    "), false);
       break;
     }
     case ExprssionType::Brackets: {
-      std::cout << "\033[1;33mBrackets\033[0m" << std::endl;
+      std::cout << YELLOW << "Brackets" << RESET << std::endl;
       _left->printTree(prefix + (is_right ? "|   " : "    "), false);
       break;
     }
     case ExprssionType::Or: {
-      std::cout << "\033[1;33mOr\033[0m" << std::endl;
+      std::cout << YELLOW << "Or" << RESET << std::endl;
       _left->printTree(prefix + (is_right ? "|   " : "    "), true);
       _right->printTree(prefix + (is_right ? "|   " : "    "), false);
       break;
